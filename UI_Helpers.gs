@@ -14,9 +14,18 @@ function onOpen() {
 
 function showModal(fileName, title, width, height, params) {
   var template = HtmlService.createTemplateFromFile(fileName);
+  
   if (params) {
-    Object.keys(params).forEach(key => template[key] = params[key]);
+    Object.keys(params).forEach(function(key) {
+      // 1. On passe la variable telle quelle (ex: assetType reste assetType)
+      template[key] = params[key];
+      
+      // 2. CORRECTION : On passe aussi une version tout en minuscules
+      // Si la feuille "Kind of" envoie "MODEL", le HTML pourra utiliser "model"
+      template[key.toLowerCase()] = params[key];
+    });
   }
+  
   var html = template.evaluate().setWidth(width).setHeight(height);
   SpreadsheetApp.getUi().showModalDialog(html, title);
 }
