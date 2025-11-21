@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; background: #f9fafb; padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    label { display: block; margin-top: 15px; font-weight: 600; color: #555; }
+    input, textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+    .btn { width: 100%; padding: 12px; margin-top: 25px; background: #e67e22; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
+    .btn:hover { background: #d35400; }
+    .autocomplete-wrapper { position: relative; }
+    .autocomplete-list { border: 1px solid #eee; max-height: 150px; overflow-y: auto; position:absolute; background:white; width:100%; z-index:99; display:none; }
+    .autocomplete-item { padding: 10px; cursor: pointer; }
+    .autocomplete-item:hover { background: #f0f0f0; }
+    #loading { display:none; text-align:center; font-weight:bold; margin-top:10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h3 id="formTitle">Remplacement</h3>
+
+    <label>Ancien Service Tag (Retour Stock) :</label>
+    <div class="autocomplete-wrapper">
+        <input type="text" id="oldTag" autocomplete="off">
+        <div id="oldList" class="autocomplete-list"></div>
+    </div>
+
+    <label>Nouveau Service Tag (Vers User) :</label>
+    <div class="autocomplete-wrapper">
+        <input type="text" id="newTag" autocomplete="off">
+        <div id="newList" class="autocomplete-list"></div>
+    </div>
+
+    <label>Ticket Number :</label>
+    <input type="text" id="ticket">
+
+    <label>Observation :</label>
+    <textarea id="observation" rows="3"></textarea>
+
+    <button class="btn" onclick="submitReplace()">Effectuer le Remplacement</button>
+    <div id="loading">Traitement...</div>
+  </div>
+
+  <script>
+    const ASSET_TYPE = "<?= assetType ?>";
+    const IS_LAPTOP = (ASSET_TYPE === 'LAPTOP');
+
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('formTitle').innerText = IS_LAPTOP ? "Remplacer Laptop" : "Remplacer Monitor";
+      setupAutocomplete('oldTag', 'oldList');
+      setupAutocomplete('newTag', 'newList');
+    });
+
+    function setupAutocomplete(inputId, listId) {
+      const input = document.getElementById(inputId);
+      const list = document.getElementById(listId);
+      input.addEventListener('input', () => {
+        const val = input.value.toLowerCase();
+        if(val.length < 2) { list.style.display = 'none'; return; }
+        
+        const func = IS_LAPTOP ? 'getServiceTags' : 'getServiceTagsMonitor';
+        google.script.run.withSuccessHandler(tags => {
+           list.innerHTML = '';
+           tags.filter(t => t.toLowerCase().includes(val)).forEach(t => {
+               let d = document.createElement('div'); d.className = 'autocomplete-item'; d.innerText = t;
+               d.onclick = () => { input.value = t; list.style.display = 'none'; };
+               list.appendChild(d);
+           });
+           list.style.display = 'block';
+        })[func]();
+      });
+      document.addEventListener('click', e => { if (e.target !== input) list.style.display = 'none'; });
+    }
+
+    function submitReplace() {
+        const oldTag = document.getElementById('oldTag').value;
+        const newTag = document.getElementById('newTag').value;
+        const ticket = document.getElementById('ticket').value;
+        const obs = document.getElementById('observation').value;
+
+        if(!oldTag || !newTag) { alert("Les deux Service Tags sont requis."); return; }
+
+        document.getElementById('loading').style.display = 'block';
+        const func = IS_LAPTOP ? 'replaceDeviceInSheet' : 'replaceMonitorInSheet';
+        
+        google.script.run.withSuccessHandler(res => {
+            document.getElementById('loading').style.display = 'none';
+            alert(res);
+            google.script.host.close();
+        }).withFailureHandler(e => {
+            document.getElementById('loading').style.display = 'none';
+            alert("Erreur: " + e.message);
+        })[func](oldTag, newTag, obs, ticket);
+    }
+  </script>
+</body>
+</html>
